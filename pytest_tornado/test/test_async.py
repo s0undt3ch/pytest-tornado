@@ -117,7 +117,7 @@ def test_timeout_as_fixture(testdir):
 
     # fnmatch_lines does an assertion internally
     result.stdout.fnmatch_lines([
-        '*tornado.ioloop.TimeoutError: Operation timed out after 0.1 seconds',
+        '*TimeoutError: Operation timed out after 0.1 seconds',
     ])
 
 
@@ -140,5 +140,5 @@ def test_gen_test_timeout_overrides_timeout_fixture(testdir):
 
     # fnmatch_lines does an assertion internally
     result.stdout.fnmatch_lines([
-        '*tornado.ioloop.TimeoutError: Operation timed out after 0.1 seconds',
+        '*TimeoutError: Operation timed out after 0.1 seconds',
     ])
