@@ -68,12 +68,28 @@ def _argnames(func):
     return spec.args[1:]
 
 
-def _timeout(item):
-    default_timeout = item.config.getoption('async_test_timeout')
-    gen_test = item.get_marker('gen_test')
+@pytest.fixture
+def async_test_timeout(request):
+    '''
+    This fixtures returns the config option value for async_test_timeout
+
+    Please implement this fixture if you wish to provide an alternative
+    async_test_timeout value.
+    '''
+    return request.config.getoption('async_test_timeout')
+
+
+@pytest.fixture
+def _async_test_timeout_(request, async_test_timeout):
+    '''
+    This fixture is internal and is meant to return the async_test_timeout value
+    based on the gen_test timeout keyword argument if defined, or the value of
+    the async_test_timeout fixture
+    '''
+    gen_test = request.node.get_marker('gen_test')
     if gen_test:
-        return gen_test.kwargs.get('timeout', default_timeout)
-    return default_timeout
+        return gen_test.kwargs.get('timeout', async_test_timeout)
+    return async_test_timeout
 
 
 @pytest.mark.tryfirst
@@ -85,15 +101,19 @@ def pytest_pycollect_makeitem(collector, name, obj):
 
 
 def pytest_runtest_setup(item):
-    if 'gen_test' in item.keywords and 'io_loop' not in item.fixturenames:
-        # inject an event loop fixture for all async tests
-        item.fixturenames.append('io_loop')
+    if 'gen_test' in item.keywords:
+        if 'io_loop' not in item.fixturenames:
+            # inject an event loop fixture for all async tests
+            item.fixturenames.append('io_loop')
+        if '_async_test_timeout_' not in item.fixturenames:
+            item.fixturenames.append('_async_test_timeout_')
 
 
 @pytest.mark.tryfirst
 def pytest_pyfunc_call(pyfuncitem):
     gen_test_mark = pyfuncitem.keywords.get('gen_test')
     if gen_test_mark:
+        _async_test_timeout = pyfuncitem.funcargs.get('_async_test_timeout_')
         io_loop = pyfuncitem.funcargs.get('io_loop')
         run_sync = gen_test_mark.kwargs.get('run_sync', True)
 
@@ -106,13 +126,13 @@ def pytest_pyfunc_call(pyfuncitem):
             coroutine = tornado.gen.coroutine(pyfuncitem.obj)
             future = coroutine(**funcargs)
         if run_sync:
-            io_loop.run_sync(lambda: future, timeout=_timeout(pyfuncitem))
+            io_loop.run_sync(lambda: future, timeout=_async_test_timeout)
         else:
             # Run this test function as a coroutine, until the timeout. When completed, stop the IOLoop
             # and reraise any exceptions
 
             future_with_timeout = with_timeout(
-                    datetime.timedelta(seconds=_timeout(pyfuncitem)),
+                    datetime.timedelta(seconds=_async_test_timeout),
                     future)
             io_loop.add_future(future_with_timeout, lambda f: io_loop.stop())
             io_loop.start()
