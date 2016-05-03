@@ -98,6 +98,7 @@ class TestClass:
             1 / 0
 
 
+@pytest.mark.skipif(tornado.version_info < (4, 1), reason='These tests will fail on Tornado < 4.1')
 @pytest.mark.gen_test
 def test_timeout_as_fixture(testdir):
     testdir.makepyfile(
@@ -121,6 +122,7 @@ def test_timeout_as_fixture(testdir):
     ])
 
 
+@pytest.mark.skipif(tornado.version_info < (4, 1), reason='These tests will fail on Tornado < 4.1')
 @pytest.mark.gen_test
 def test_gen_test_timeout_overrides_timeout_fixture(testdir):
     testdir.makepyfile(
