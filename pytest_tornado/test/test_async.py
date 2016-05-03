@@ -4,6 +4,7 @@ import tornado
 from tornado import gen
 from tornado.ioloop import TimeoutError
 
+pytest_plugins = 'pytester'
 
 @gen.coroutine
 def dummy_coroutine(io_loop):
@@ -95,3 +96,49 @@ class TestClass:
         with pytest.raises(ZeroDivisionError):
             yield gen.Task(io_loop.add_callback)
             1 / 0
+
+
+@pytest.mark.gen_test
+def test_timeout_as_fixture(testdir):
+    testdir.makepyfile(
+    '''
+    import pytest
+    from tornado import gen
+
+    @pytest.fixture
+    def async_test_timeout():
+        return 0.1
+    @pytest.mark.gen_test
+    def test_timeout_fixture():
+        yield gen.sleep(0.5)
+    ''')
+
+    result = testdir.runpytest('-s')
+
+    # fnmatch_lines does an assertion internally
+    result.stdout.fnmatch_lines([
+        '*tornado.ioloop.TimeoutError: Operation timed out after 0.1 seconds',
+    ])
+
+
+@pytest.mark.gen_test
+def test_gen_test_timeout_overrides_timeout_fixture(testdir):
+    testdir.makepyfile(
+    '''
+    import pytest
+    from tornado import gen
+
+    @pytest.fixture
+    def async_test_timeout():
+        return 1
+    @pytest.mark.gen_test(timeout=0.1)
+    def test_timeout_fixture():
+        yield gen.sleep(2)
+    ''')
+
+    result = testdir.runpytest('-s')
+
+    # fnmatch_lines does an assertion internally
+    result.stdout.fnmatch_lines([
+        '*tornado.ioloop.TimeoutError: Operation timed out after 0.1 seconds',
+    ])
